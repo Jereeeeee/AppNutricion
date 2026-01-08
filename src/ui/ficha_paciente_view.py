@@ -7,7 +7,7 @@ from tkinter import messagebox
 from datetime import datetime, date
 from src.database.db_utils import (
     obtener_mediciones_paciente, obtener_historial_paciente,
-    obtener_pautas_paciente, actualizar_paciente
+    obtener_pautas_paciente, actualizar_paciente, eliminar_pauta, actualizar_pauta
 )
 from src.utils.pdf_generator import GeneradorInformes
 import os
@@ -330,13 +330,28 @@ class FichaPacienteView(ctk.CTkFrame):
     
     def crear_seccion_pautas(self, parent):
         """Crea la sección de pautas nutricionales"""
-        # Título
+        # Título con botón de gestión
+        titulo_frame = ctk.CTkFrame(parent, fg_color="transparent")
+        titulo_frame.pack(fill="x", pady=(25, 18), padx=0)
+        
         titulo = ctk.CTkLabel(
-            parent,
+            titulo_frame,
             text="📋 Pautas Nutricionales",
             font=ctk.CTkFont(size=22, weight="bold")
         )
-        titulo.pack(anchor="w", pady=(25, 18), padx=0)
+        titulo.pack(side="left", anchor="w")
+        
+        # Botón gestionar pautas
+        btn_gestionar = ctk.CTkButton(
+            titulo_frame,
+            text="⚙️ Gestionar Pautas",
+            command=self.gestionar_pautas,
+            width=150,
+            height=30,
+            fg_color=("#9C27B0", "#6A1B9A"),
+            hover_color=("#7B1FA2", "#5E0B8A")
+        )
+        btn_gestionar.pack(side="right", padx=5)
         
         pautas = obtener_pautas_paciente(self.db_session, self.paciente.id)
         
@@ -441,6 +456,240 @@ class FichaPacienteView(ctk.CTkFrame):
             text_color=("gray30", "gray70")
         )
         valor_widget.pack(anchor="w", padx=0)
+    
+    def gestionar_pautas(self):
+        """Abre ventana para gestionar todas las pautas del paciente"""
+        ventana = ctk.CTkToplevel(self)
+        ventana.title(f"Gestionar Pautas - {self.paciente.nombre_completo()}")
+        ventana.geometry("900x600")
+        ventana.grab_set()
+        
+        # Frame principal con scroll
+        scroll_frame = ctk.CTkScrollableFrame(ventana)
+        scroll_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Título
+        titulo = ctk.CTkLabel(
+            scroll_frame,
+            text="📋 Todas las Pautas Nutricionales",
+            font=ctk.CTkFont(size=20, weight="bold")
+        )
+        titulo.pack(pady=(0, 20))
+        
+        # Obtener todas las pautas
+        pautas = obtener_pautas_paciente(self.db_session, self.paciente.id)
+        
+        if not pautas:
+            label = ctk.CTkLabel(
+                scroll_frame,
+                text="📭 No hay pautas registradas",
+                font=ctk.CTkFont(size=14),
+                text_color="gray"
+            )
+            label.pack(pady=40)
+        else:
+            # Mostrar cada pauta
+            for idx, pauta in enumerate(pautas, 1):
+                self._crear_tarjeta_pauta(scroll_frame, pauta, idx, ventana)
+    
+    def _crear_tarjeta_pauta(self, parent, pauta, numero, ventana_padre):
+        """Crea una tarjeta con información de pauta y botones editar/eliminar"""
+        card = ctk.CTkFrame(parent, fg_color=("#f5f5f5", "#2b2b2b"), corner_radius=10)
+        card.pack(fill="x", pady=(0, 15))
+        
+        # Encabezado con número y fecha
+        header = ctk.CTkFrame(card, fg_color="transparent")
+        header.pack(fill="x", padx=15, pady=(15, 10))
+        
+        titulo_pauta = ctk.CTkLabel(
+            header,
+            text=f"Pauta #{numero} - {pauta.titulo if hasattr(pauta, 'titulo') and pauta.titulo else 'Sin título'}",
+            font=ctk.CTkFont(size=14, weight="bold")
+        )
+        titulo_pauta.pack(side="left", anchor="w")
+        
+        fecha = ctk.CTkLabel(
+            header,
+            text=f"📅 {pauta.fecha_inicio.strftime('%d/%m/%Y')} - {pauta.fecha_fin.strftime('%d/%m/%Y') if pauta.fecha_fin else 'Sin fin'}",
+            font=ctk.CTkFont(size=11),
+            text_color="gray"
+        )
+        fecha.pack(side="right")
+        
+        # Macros en una fila
+        macros_frame = ctk.CTkFrame(card, fg_color="transparent")
+        macros_frame.pack(fill="x", padx=15, pady=(0, 10))
+        
+        datos = [
+            f"🔥 {int(pauta.calorias_objetivo) if pauta.calorias_objetivo else 0} kcal",
+            f"🥩 {pauta.proteinas if pauta.proteinas else 0}g",
+            f"🍞 {pauta.carbohidratos if pauta.carbohidratos else 0}g",
+            f"🥑 {pauta.grasas if pauta.grasas else 0}g"
+        ]
+        
+        for dato in datos:
+            label = ctk.CTkLabel(
+                macros_frame,
+                text=dato,
+                font=ctk.CTkFont(size=11),
+                text_color=("#9C27B0", "#E1BEE7")
+            )
+            label.pack(side="left", padx=(0, 20))
+        
+        # Botones de acción
+        btn_frame = ctk.CTkFrame(card, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=15, pady=(5, 15))
+        
+        btn_editar = ctk.CTkButton(
+            btn_frame,
+            text="✏️ Editar",
+            command=lambda p=pauta: self._editar_pauta(p, ventana_padre),
+            width=120,
+            height=32,
+            fg_color=("#2196F3", "#1976D2"),
+            hover_color=("#1976D2", "#1565C0")
+        )
+        btn_editar.pack(side="left", padx=(0, 10))
+        
+        btn_eliminar = ctk.CTkButton(
+            btn_frame,
+            text="🗑️ Eliminar",
+            command=lambda p=pauta: self._eliminar_pauta(p, ventana_padre),
+            width=120,
+            height=32,
+            fg_color=("#f44336", "#d32f2f"),
+            hover_color=("#d32f2f", "#c62828")
+        )
+        btn_eliminar.pack(side="left")
+    
+    def _editar_pauta(self, pauta, ventana_padre):
+        """Abre diálogo para editar una pauta"""
+        ventana = ctk.CTkToplevel(ventana_padre)
+        ventana.title(f"Editar Pauta")
+        ventana.geometry("500x600")
+        ventana.grab_set()
+        
+        scroll = ctk.CTkScrollableFrame(ventana)
+        scroll.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Título
+        ctk.CTkLabel(
+            scroll,
+            text="Editar Pauta Nutricional",
+            font=ctk.CTkFont(size=18, weight="bold")
+        ).pack(pady=(0, 20))
+        
+        # Campos de edición
+        campos = {}
+        
+        # Título de la pauta
+        ctk.CTkLabel(scroll, text="Título:").pack(anchor="w", pady=(5, 0))
+        campos['titulo'] = ctk.CTkEntry(scroll, width=400)
+        campos['titulo'].insert(0, pauta.titulo if hasattr(pauta, 'titulo') and pauta.titulo else "")
+        campos['titulo'].pack(pady=(0, 10))
+        
+        # Calorías
+        ctk.CTkLabel(scroll, text="Calorías objetivo:").pack(anchor="w", pady=(5, 0))
+        campos['calorias_objetivo'] = ctk.CTkEntry(scroll, width=400)
+        campos['calorias_objetivo'].insert(0, str(pauta.calorias_objetivo) if pauta.calorias_objetivo else "")
+        campos['calorias_objetivo'].pack(pady=(0, 10))
+        
+        # Proteínas
+        ctk.CTkLabel(scroll, text="Proteínas (g):").pack(anchor="w", pady=(5, 0))
+        campos['proteinas'] = ctk.CTkEntry(scroll, width=400)
+        campos['proteinas'].insert(0, str(pauta.proteinas) if pauta.proteinas else "")
+        campos['proteinas'].pack(pady=(0, 10))
+        
+        # Carbohidratos
+        ctk.CTkLabel(scroll, text="Carbohidratos (g):").pack(anchor="w", pady=(5, 0))
+        campos['carbohidratos'] = ctk.CTkEntry(scroll, width=400)
+        campos['carbohidratos'].insert(0, str(pauta.carbohidratos) if pauta.carbohidratos else "")
+        campos['carbohidratos'].pack(pady=(0, 10))
+        
+        # Grasas
+        ctk.CTkLabel(scroll, text="Grasas (g):").pack(anchor="w", pady=(5, 0))
+        campos['grasas'] = ctk.CTkEntry(scroll, width=400)
+        campos['grasas'].insert(0, str(pauta.grasas) if pauta.grasas else "")
+        campos['grasas'].pack(pady=(0, 10))
+        
+        # Descripción
+        ctk.CTkLabel(scroll, text="Descripción:").pack(anchor="w", pady=(5, 0))
+        campos['descripcion'] = ctk.CTkTextbox(scroll, width=400, height=80)
+        if pauta.descripcion:
+            campos['descripcion'].insert("1.0", pauta.descripcion)
+        campos['descripcion'].pack(pady=(0, 10))
+        
+        # Indicaciones
+        ctk.CTkLabel(scroll, text="Indicaciones:").pack(anchor="w", pady=(5, 0))
+        campos['indicaciones'] = ctk.CTkTextbox(scroll, width=400, height=80)
+        if pauta.indicaciones:
+            campos['indicaciones'].insert("1.0", pauta.indicaciones)
+        campos['indicaciones'].pack(pady=(0, 20))
+        
+        # Botones
+        def guardar():
+            try:
+                datos_actualizados = {
+                    'titulo': campos['titulo'].get(),
+                    'calorias_objetivo': float(campos['calorias_objetivo'].get()) if campos['calorias_objetivo'].get() else None,
+                    'proteinas': float(campos['proteinas'].get()) if campos['proteinas'].get() else None,
+                    'carbohidratos': float(campos['carbohidratos'].get()) if campos['carbohidratos'].get() else None,
+                    'grasas': float(campos['grasas'].get()) if campos['grasas'].get() else None,
+                    'descripcion': campos['descripcion'].get("1.0", "end-1c"),
+                    'indicaciones': campos['indicaciones'].get("1.0", "end-1c")
+                }
+                
+                actualizar_pauta(self.db_session, pauta.id, **datos_actualizados)
+                messagebox.showinfo("Éxito", "Pauta actualizada correctamente")
+                ventana.destroy()
+                ventana_padre.destroy()
+                self.actualizar_vista()
+            except Exception as e:
+                messagebox.showerror("Error", f"Error al actualizar: {str(e)}")
+        
+        btn_frame = ctk.CTkFrame(scroll, fg_color="transparent")
+        btn_frame.pack(pady=10)
+        
+        ctk.CTkButton(
+            btn_frame,
+            text="💾 Guardar",
+            command=guardar,
+            width=150,
+            fg_color=("#4CAF50", "#45a049"),
+            hover_color=("#45a049", "#3d8b40")
+        ).pack(side="left", padx=5)
+        
+        ctk.CTkButton(
+            btn_frame,
+            text="❌ Cancelar",
+            command=ventana.destroy,
+            width=150,
+            fg_color="#666666",
+            hover_color="#505050"
+        ).pack(side="left", padx=5)
+    
+    def _eliminar_pauta(self, pauta, ventana_padre):
+        """Elimina una pauta tras confirmación"""
+        respuesta = messagebox.askyesno(
+            "Confirmar eliminación",
+            f"¿Estás seguro de eliminar esta pauta?\n\nEsta acción no se puede deshacer."
+        )
+        
+        if respuesta:
+            try:
+                eliminar_pauta(self.db_session, pauta.id)
+                messagebox.showinfo("Éxito", "Pauta eliminada correctamente")
+                ventana_padre.destroy()
+                self.actualizar_vista()
+            except Exception as e:
+                messagebox.showerror("Error", f"Error al eliminar: {str(e)}")
+    
+    def actualizar_vista(self):
+        """Recarga la vista del paciente"""
+        # Destruir el contenido actual y recrearlo
+        for widget in self.winfo_children():
+            widget.destroy()
+        self.__init__(self.master, self.db_session, self.paciente, self.callback_volver)
     
     def editar_paciente(self):
         """Abre el diálogo para editar el paciente"""

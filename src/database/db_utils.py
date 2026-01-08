@@ -117,3 +117,23 @@ def obtener_pauta_activa(session, paciente_id):
         Pauta.fecha_inicio <= hoy,
         Pauta.fecha_fin >= hoy
     ).first()
+
+
+def actualizar_pauta(session, pauta_id, **kwargs):
+    """Actualiza una pauta existente"""
+    pauta = session.query(Pauta).filter_by(id=pauta_id).first()
+    if pauta:
+        for key, value in kwargs.items():
+            setattr(pauta, key, value)
+        session.commit()
+    return pauta
+
+
+def eliminar_pauta(session, pauta_id):
+    """Elimina una pauta"""
+    pauta = session.query(Pauta).filter_by(id=pauta_id).first()
+    if pauta:
+        session.delete(pauta)
+        session.commit()
+        return True
+    return False

@@ -141,8 +141,8 @@ class GeneradorInformes:
             
             elementos.append(Spacer(1, 0.7*cm))
         
-        # Pauta nutricional existente
-        if pauta:
+        # Pauta nutricional existente con comidas definidas
+        if pauta and (pauta.desayuno or pauta.almuerzo or pauta.cena):
             elementos.append(PageBreak())
             elementos.append(Paragraph("PAUTA NUTRICIONAL", self.styles['SubtituloPersonalizado']))
             elementos.append(Paragraph(f"<b>{pauta.titulo}</b>", self.styles['Normal']))
@@ -157,7 +157,7 @@ class GeneradorInformes:
             elementos.append(Paragraph(f"<b>Macronutrientes:</b> {macros}", self.styles['Normal']))
             elementos.append(Spacer(1, 0.5*cm))
             
-            # Comidas del día
+            # Comidas del día (tabla)
             comidas = [
                 ('DESAYUNO', pauta.desayuno),
                 ('MEDIA MAÑANA', pauta.media_manana),
@@ -166,21 +166,37 @@ class GeneradorInformes:
                 ('CENA', pauta.cena),
             ]
             
+            filas = [['Comida', 'Detalle']]
             for nombre_comida, contenido in comidas:
                 if contenido:
-                    elementos.append(Paragraph(f"<b>{nombre_comida}</b>", self.styles['Heading3']))
-                    elementos.append(Paragraph(contenido, self.styles['Normal']))
-                    elementos.append(Spacer(1, 0.3*cm))
+                    detalle = Paragraph((contenido or '').replace('\n','<br/>'), self.styles['Normal'])
+                    filas.append([nombre_comida, detalle])
+            if len(filas) > 1:
+                tabla_comidas = Table(filas, colWidths=[5*cm, 10*cm])
+                tabla_comidas.setStyle(TableStyle([
+                    ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#2E7D32')),
+                    ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+                    ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                    ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+                    ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                    ('FONTSIZE', (0,0), (-1,-1), 9),
+                    ('GRID', (0,0), (-1,-1), 1, colors.grey),
+                    ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#F1F8E9')]),
+                    ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+                    ('TOPPADDING', (0,0), (-1,-1), 6),
+                ]))
+                elementos.append(tabla_comidas)
+                elementos.append(Spacer(1, 0.5*cm))
             
             if pauta.indicaciones:
                 elementos.append(Spacer(1, 0.5*cm))
                 elementos.append(Paragraph("<b>INDICACIONES GENERALES</b>", self.styles['Heading3']))
                 elementos.append(Paragraph(pauta.indicaciones, self.styles['Normal']))
-        # Pauta de ejemplo si no existe una pauta y tenemos datos suficientes
-        elif mediciones and len(mediciones) > 0:
-            ultima_medicion = mediciones[0]
+        # Pauta nutricional calculada automáticamente (sin pauta guardada o sin comidas)
+        else:
+            ultima_medicion = mediciones[0] if (mediciones and len(mediciones) > 0) else None
             elementos.append(PageBreak())
-            elementos.append(Paragraph("PAUTA DE EJEMPLO (AUTOGENERADA)", self.styles['SubtituloPersonalizado']))
+            elementos.append(Paragraph("PAUTA NUTRICIONAL", self.styles['SubtituloPersonalizado']))
 
             plan = self._generar_pauta_ejemplo(paciente, ultima_medicion, historial[0] if historial else None)
 
@@ -188,17 +204,33 @@ class GeneradorInformes:
                 f"<b>Calorías objetivo:</b> {plan['calorias']} kcal/día",
                 self.styles['Normal']
             ))
-            elementos.append(Paragraph(
-                f"<b>Macronutrientes:</b> Proteínas {plan['proteinas_g']} g | Carbohidratos {plan['carbohidratos_g']} g | Grasas {plan['grasas_g']} g",
-                self.styles['Normal']
-            ))
+            
+            macros = f"Proteínas: {plan['proteinas_g']}g | Carbohidratos: {plan['carbohidratos_g']}g | Grasas: {plan['grasas_g']}g"
+            elementos.append(Paragraph(f"<b>Macronutrientes:</b> {macros}", self.styles['Normal']))
             elementos.append(Spacer(1, 0.5*cm))
 
-            for nombre, items in plan['comidas']:
-                elementos.append(Paragraph(f"<b>{nombre}</b>", self.styles['Heading3']))
-                for it in items:
-                    elementos.append(Paragraph(f"• {it}", self.styles['Normal']))
-                elementos.append(Spacer(1, 0.25*cm))
+            # Plan semanal de 7 días (tablas)
+            for dia_nombre, comidas in plan['dias']:
+                elementos.append(Paragraph(f"<b>{dia_nombre}</b>", self.styles['Heading3']))
+                filas = [['Comida', 'Detalle']]
+                for nombre, items in comidas:
+                    detalle = '• ' + '<br/>• '.join(items)
+                    filas.append([nombre, Paragraph(detalle, self.styles['Normal'])])
+                tabla_dia = Table(filas, colWidths=[5*cm, 10*cm])
+                tabla_dia.setStyle(TableStyle([
+                    ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#2E7D32')),
+                    ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+                    ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                    ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+                    ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                    ('FONTSIZE', (0,0), (-1,-1), 9),
+                    ('GRID', (0,0), (-1,-1), 1, colors.grey),
+                    ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#F1F8E9')]),
+                    ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+                    ('TOPPADDING', (0,0), (-1,-1), 6),
+                ]))
+                elementos.append(tabla_dia)
+                elementos.append(Spacer(1, 0.5*cm))
         
         # Generar el PDF
         doc.build(elementos)
@@ -297,8 +329,8 @@ class GeneradorInformes:
         except Exception:
             edad = None
 
-        peso = medicion.peso or 70
-        altura_cm = medicion.altura or 170
+        peso = (getattr(medicion, 'peso', None) or 70)
+        altura_cm = (getattr(medicion, 'altura', None) or 170)
         sexo = (paciente.sexo or '').lower()
 
         # BMR Mifflin-St Jeor
@@ -325,38 +357,45 @@ class GeneradorInformes:
         grasas_g = int(round(0.30 * calorias / 9))
         carbs_g = int(round((calorias - proteinas_g * 4 - grasas_g * 9) / 4))
 
-        # Propuesta de comidas con porciones
-        # Porciones referenciales: 1 porción ~ 15 g CHO; 1 porción prot ~ 20 g prot
-        comidas = [
-            ("DESAYUNO", [
-                "Avena 60 g + leche descremada 250 ml",
-                "Plátano 1 mediano",
-                "Nueces 15 g",
-            ]),
-            ("MEDIA MAÑANA", [
-                "Yogur natural 170 g",
-                "Fruta de estación 1 unidad",
-            ]),
-            ("ALMUERZO", [
-                "Pechuga de pollo 150 g",
-                "Arroz integral 120 g cocido",
-                "Ensalada mixta + aceite de oliva 1 cda",
-            ]),
-            ("MERIENDA", [
-                "Pan integral 2 rebanadas (60 g) + palta 1/4",
-                "Quesillo 60 g",
-            ]),
-            ("CENA", [
-                "Pescado 150 g",
-                "Papas asadas 200 g",
-                "Verduras salteadas 200 g",
-            ]),
+        # Base de porciones (constantes para mantener cantidades comparables)
+        desayunos = [
+            ["Avena 60 g + leche descremada 250 ml", "Plátano 1 mediano", "Nueces 15 g"],
+            ["Pan integral 70 g + queso fresco 40 g", "Palta 1/4", "Fruta 1 unidad"],
+            ["Huevos 2 unid + pan integral 60 g", "Tomate 1 unidad", "Aceite de oliva 1 cdita"],
         ]
+        medias = [
+            ["Yogur natural 170 g", "Fruta de estación 1 unidad"],
+            ["Leche descremada 250 ml", "Frutos secos 20 g"],
+            ["Kefir 200 ml", "Manzana 1 unidad"],
+        ]
+        proteinas = ["Pechuga de pollo 150 g", "Pavo 150 g", "Carne magra 150 g", "Legumbres 200 g cocidas", "Atún 150 g"]
+        carbo = ["Arroz integral 120 g cocido", "Pasta integral 120 g cocida", "Quinoa 120 g cocida", "Papas asadas 200 g", "Batata 200 g"]
+        cenas_prot = ["Pescado 150 g", "Huevo 3 unid", "Tofu 150 g", "Pavo 150 g", "Carne magra 150 g"]
+        verduras = ["Ensalada mixta + aceite de oliva 1 cda", "Verduras salteadas 200 g", "Verduras al vapor 200 g"]
+
+        def dia(idx: int):
+            # Rotación simple respetando porciones similares
+            des = desayunos[idx % len(desayunos)]
+            mm = medias[idx % len(medias)]
+            alm = [proteinas[idx % len(proteinas)], carbo[idx % len(carbo)], verduras[idx % len(verduras)]]
+            mer = ["Pan integral 2 rebanadas (60 g) + palta 1/4", "Quesillo 60 g"] if idx % 2 == 0 else ["Tostadas integrales 60 g", "Pasta de maní 1 cda"]
+            cen = [cenas_prot[idx % len(cenas_prot)], carbo[(idx+2) % len(carbo)], verduras[(idx+1) % len(verduras)]]
+            return [
+                ("DESAYUNO", des),
+                ("MEDIA MAÑANA", mm),
+                ("ALMUERZO", alm),
+                ("MERIENDA", mer),
+                ("CENA", cen),
+            ]
+
+        dias = []
+        for i in range(7):
+            dias.append((f"Día {i+1}", dia(i)))
 
         return {
             'calorias': calorias,
             'proteinas_g': proteinas_g,
             'carbohidratos_g': carbs_g,
             'grasas_g': grasas_g,
-            'comidas': comidas,
+            'dias': dias,
         }

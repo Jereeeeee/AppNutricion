@@ -26,3 +26,6 @@ data/*.db
 # OS
 .DS_Store
 Thumbs.db
+
+# Reportes PDF generados
+informes/

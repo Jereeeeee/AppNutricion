@@ -1,0 +1,71 @@
+Replace two sections in src/utils/pdf_generator.py:
+
+1) Replace the loop rendering comidas for saved pauta (lines shown below) with a table build.
+
+OLD:
+            for nombre_comida, contenido in comidas:
+                if contenido:
+                    elementos.append(Paragraph(f"<b>{nombre_comida}</b>", self.styles['Heading3']))
+                    elementos.append(Paragraph(contenido, self.styles['Normal']))
+                    elementos.append(Spacer(1, 0.3*cm))
+
+NEW:
+            filas = [['Comida', 'Detalle']]
+            for nombre_comida, contenido in comidas:
+                if contenido:
+                    detalle = Paragraph((contenido or '').replace('\n','<br/>'), self.styles['Normal'])
+                    filas.append([nombre_comida, detalle])
+            if len(filas) > 1:
+                tabla_comidas = Table(filas, colWidths=[5*cm, 10*cm])
+                tabla_comidas.setStyle(TableStyle([
+                    ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#2E7D32')),
+                    ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+                    ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                    ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+                    ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                    ('FONTSIZE', (0,0), (-1,-1), 9),
+                    ('GRID', (0,0), (-1,-1), 1, colors.grey),
+                    ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#F1F8E9')]),
+                    ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+                    ('TOPPADDING', (0,0), (-1,-1), 6),
+                ]))
+                elementos.append(tabla_comidas)
+                elementos.append(Spacer(1, 0.5*cm))
+
+2) Replace the per-day bullet list with a per-day table.
+
+OLD:
+            # Plan semanal de 7 días
+            for dia_nombre, comidas in plan['dias']:
+                elementos.append(Paragraph(f"<b>{dia_nombre}</b>", self.styles['Heading3']))
+                elementos.append(Spacer(1, 0.2*cm))
+                for nombre, items in comidas:
+                    elementos.append(Paragraph(f"<b>{nombre}</b>", self.styles['Normal']))
+                    for it in items:
+                        elementos.append(Paragraph(f"• {it}", self.styles['Normal']))
+                    elementos.append(Spacer(1, 0.2*cm))
+                elementos.append(Spacer(1, 0.3*cm))
+
+NEW:
+            # Plan semanal de 7 días en tablas
+            for dia_nombre, comidas in plan['dias']:
+                elementos.append(Paragraph(f"<b>{dia_nombre}</b>", self.styles['Heading3']))
+                filas = [['Comida', 'Detalle']]
+                for nombre, items in comidas:
+                    detalle = '• ' + '<br/>• '.join(items)
+                    filas.append([nombre, Paragraph(detalle, self.styles['Normal'])])
+                tabla_dia = Table(filas, colWidths=[5*cm, 10*cm])
+                tabla_dia.setStyle(TableStyle([
+                    ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#2E7D32')),
+                    ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+                    ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                    ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+                    ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                    ('FONTSIZE', (0,0), (-1,-1), 9),
+                    ('GRID', (0,0), (-1,-1), 1, colors.grey),
+                    ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor('#F1F8E9')]),
+                    ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+                    ('TOPPADDING', (0,0), (-1,-1), 6),
+                ]))
+                elementos.append(tabla_dia)
+                elementos.append(Spacer(1, 0.5*cm))
