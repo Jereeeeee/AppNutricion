@@ -9,6 +9,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
 from datetime import datetime
 import os
+import math
 
 
 class GeneradorInformes:
@@ -140,7 +141,7 @@ class GeneradorInformes:
             
             elementos.append(Spacer(1, 0.7*cm))
         
-        # Pauta nutricional
+        # Pauta nutricional existente
         if pauta:
             elementos.append(PageBreak())
             elementos.append(Paragraph("PAUTA NUTRICIONAL", self.styles['SubtituloPersonalizado']))
@@ -175,6 +176,29 @@ class GeneradorInformes:
                 elementos.append(Spacer(1, 0.5*cm))
                 elementos.append(Paragraph("<b>INDICACIONES GENERALES</b>", self.styles['Heading3']))
                 elementos.append(Paragraph(pauta.indicaciones, self.styles['Normal']))
+        # Pauta de ejemplo si no existe una pauta y tenemos datos suficientes
+        elif mediciones and len(mediciones) > 0:
+            ultima_medicion = mediciones[0]
+            elementos.append(PageBreak())
+            elementos.append(Paragraph("PAUTA DE EJEMPLO (AUTOGENERADA)", self.styles['SubtituloPersonalizado']))
+
+            plan = self._generar_pauta_ejemplo(paciente, ultima_medicion, historial[0] if historial else None)
+
+            elementos.append(Paragraph(
+                f"<b>Calorías objetivo:</b> {plan['calorias']} kcal/día",
+                self.styles['Normal']
+            ))
+            elementos.append(Paragraph(
+                f"<b>Macronutrientes:</b> Proteínas {plan['proteinas_g']} g | Carbohidratos {plan['carbohidratos_g']} g | Grasas {plan['grasas_g']} g",
+                self.styles['Normal']
+            ))
+            elementos.append(Spacer(1, 0.5*cm))
+
+            for nombre, items in plan['comidas']:
+                elementos.append(Paragraph(f"<b>{nombre}</b>", self.styles['Heading3']))
+                for it in items:
+                    elementos.append(Paragraph(f"• {it}", self.styles['Normal']))
+                elementos.append(Spacer(1, 0.25*cm))
         
         # Generar el PDF
         doc.build(elementos)
@@ -258,3 +282,81 @@ class GeneradorInformes:
         # Generar el PDF
         doc.build(elementos)
         return ruta_completa
+
+    def _generar_pauta_ejemplo(self, paciente, medicion, historial):
+        """Crea una pauta de ejemplo a partir de peso/altura/sexo/edad/actividad.
+        - Estima calorías con Mifflin-St Jeor y factor de actividad.
+        - Distribuye macros aproximados y propone porciones por comida.
+        """
+        # Estimar edad si hay fecha de nacimiento
+        edad = None
+        try:
+            if paciente.fecha_nacimiento:
+                hoy = datetime.now().date()
+                edad = hoy.year - paciente.fecha_nacimiento.year - ((hoy.month, hoy.day) < (paciente.fecha_nacimiento.month, paciente.fecha_nacimiento.day))
+        except Exception:
+            edad = None
+
+        peso = medicion.peso or 70
+        altura_cm = medicion.altura or 170
+        sexo = (paciente.sexo or '').lower()
+
+        # BMR Mifflin-St Jeor
+        if edad is None:
+            edad = 30
+        if sexo.startswith('f'):
+            bmr = 10 * peso + 6.25 * altura_cm - 5 * edad - 161
+        else:
+            bmr = 10 * peso + 6.25 * altura_cm - 5 * edad + 5
+
+        # Factor actividad
+        actividad = (getattr(historial, 'actividad_fisica', None) or '').lower() if historial else ''
+        factores = {
+            'sedentario': 1.2,
+            'ligero': 1.375,
+            'moderado': 1.55,
+            'intenso': 1.725,
+        }
+        factor = factores.get(actividad, 1.375)
+        calorias = int(round(bmr * factor))
+
+        # Macros: proteína 1.6 g/kg, grasas 30% kcal, resto carbohidratos
+        proteinas_g = int(round(max(1.4, min(2.0, 1.6)) * peso))
+        grasas_g = int(round(0.30 * calorias / 9))
+        carbs_g = int(round((calorias - proteinas_g * 4 - grasas_g * 9) / 4))
+
+        # Propuesta de comidas con porciones
+        # Porciones referenciales: 1 porción ~ 15 g CHO; 1 porción prot ~ 20 g prot
+        comidas = [
+            ("DESAYUNO", [
+                "Avena 60 g + leche descremada 250 ml",
+                "Plátano 1 mediano",
+                "Nueces 15 g",
+            ]),
+            ("MEDIA MAÑANA", [
+                "Yogur natural 170 g",
+                "Fruta de estación 1 unidad",
+            ]),
+            ("ALMUERZO", [
+                "Pechuga de pollo 150 g",
+                "Arroz integral 120 g cocido",
+                "Ensalada mixta + aceite de oliva 1 cda",
+            ]),
+            ("MERIENDA", [
+                "Pan integral 2 rebanadas (60 g) + palta 1/4",
+                "Quesillo 60 g",
+            ]),
+            ("CENA", [
+                "Pescado 150 g",
+                "Papas asadas 200 g",
+                "Verduras salteadas 200 g",
+            ]),
+        ]
+
+        return {
+            'calorias': calorias,
+            'proteinas_g': proteinas_g,
+            'carbohidratos_g': carbs_g,
+            'grasas_g': grasas_g,
+            'comidas': comidas,
+        }
