@@ -4,7 +4,8 @@ Vista para crear un nuevo paciente
 import customtkinter as ctk
 from tkinter import messagebox
 from datetime import datetime
-from src.database.db_utils import crear_paciente
+from src.database.db_utils import crear_paciente, crear_historial_clinico, buscar_paciente_por_rut
+from src.utils.rut import formatear_rut
 
 
 class NuevoPacienteView(ctk.CTkScrollableFrame):
@@ -112,6 +113,92 @@ class NuevoPacienteView(ctk.CTkScrollableFrame):
             row=10, column=0, columnspan=2, sticky="w", padx=10, pady=(5, 0))
         self.direccion_entry = ctk.CTkEntry(form_frame, placeholder_text="Calle, Número, Ciudad", height=35)
         self.direccion_entry.grid(row=11, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 10))
+
+        # Historial Clínico
+        seccion3 = ctk.CTkLabel(
+            form_frame,
+            text="HISTORIAL CLÍNICO (opcional)",
+            font=ctk.CTkFont(size=16, weight="bold")
+        )
+        seccion3.grid(row=12, column=0, columnspan=2, sticky="w", pady=(20, 15))
+
+        # Actividad física
+        ctk.CTkLabel(form_frame, text="Actividad física", font=ctk.CTkFont(size=12)).grid(
+            row=13, column=0, sticky="w", padx=10, pady=(5, 0))
+        self.act_fisica_combo = ctk.CTkComboBox(
+            form_frame,
+            values=["Sedentario", "Ligero", "Moderado", "Intenso"],
+            state="readonly",
+            cursor="arrow",
+            height=35
+        )
+        self.act_fisica_combo.grid(row=14, column=0, sticky="ew", padx=10, pady=(0, 10))
+        self.act_fisica_combo.set("Sedentario")
+        self.act_fisica_combo.bind("<Button-1>", lambda e: self.act_fisica_combo._open_dropdown_menu())
+
+        # Hábito tabáquico
+        ctk.CTkLabel(form_frame, text="Hábito tabáquico", font=ctk.CTkFont(size=12)).grid(
+            row=13, column=1, sticky="w", padx=10, pady=(5, 0))
+        self.habito_tabaquico_combo = ctk.CTkComboBox(
+            form_frame,
+            values=["No", "Sí"],
+            state="readonly",
+            cursor="arrow",
+            height=35
+        )
+        self.habito_tabaquico_combo.grid(row=14, column=1, sticky="ew", padx=10, pady=(0, 10))
+        self.habito_tabaquico_combo.set("No")
+        self.habito_tabaquico_combo.bind("<Button-1>", lambda e: self.habito_tabaquico_combo._open_dropdown_menu())
+
+        # Consumo de alcohol
+        ctk.CTkLabel(form_frame, text="Consumo de alcohol", font=ctk.CTkFont(size=12)).grid(
+            row=15, column=0, sticky="w", padx=10, pady=(5, 0))
+        self.consumo_alcohol_combo = ctk.CTkComboBox(
+            form_frame,
+            values=["Nunca", "Ocasional", "Frecuente"],
+            state="readonly",
+            cursor="arrow",
+            height=35
+        )
+        self.consumo_alcohol_combo.grid(row=16, column=0, sticky="ew", padx=10, pady=(0, 10))
+        self.consumo_alcohol_combo.set("Ocasional")
+        self.consumo_alcohol_combo.bind("<Button-1>", lambda e: self.consumo_alcohol_combo._open_dropdown_menu())
+
+        # Objetivo principal
+        ctk.CTkLabel(form_frame, text="Objetivo principal", font=ctk.CTkFont(size=12)).grid(
+            row=15, column=1, sticky="w", padx=10, pady=(5, 0))
+        self.objetivo_text = ctk.CTkTextbox(form_frame, height=70)
+        self.objetivo_text.grid(row=16, column=1, sticky="nsew", padx=10, pady=(0, 10))
+
+        # Patologías
+        ctk.CTkLabel(form_frame, text="Patologías", font=ctk.CTkFont(size=12)).grid(
+            row=17, column=0, sticky="w", padx=10, pady=(5, 0))
+        self.patologias_text = ctk.CTkTextbox(form_frame, height=60)
+        self.patologias_text.grid(row=18, column=0, sticky="nsew", padx=10, pady=(0, 10))
+
+        # Alergias
+        ctk.CTkLabel(form_frame, text="Alergias", font=ctk.CTkFont(size=12)).grid(
+            row=17, column=1, sticky="w", padx=10, pady=(5, 0))
+        self.alergias_text = ctk.CTkTextbox(form_frame, height=60)
+        self.alergias_text.grid(row=18, column=1, sticky="nsew", padx=10, pady=(0, 10))
+
+        # Intolerancias
+        ctk.CTkLabel(form_frame, text="Intolerancias", font=ctk.CTkFont(size=12)).grid(
+            row=19, column=0, sticky="w", padx=10, pady=(5, 0))
+        self.intolerancias_text = ctk.CTkTextbox(form_frame, height=60)
+        self.intolerancias_text.grid(row=20, column=0, sticky="nsew", padx=10, pady=(0, 10))
+
+        # Medicaciones
+        ctk.CTkLabel(form_frame, text="Medicaciones", font=ctk.CTkFont(size=12)).grid(
+            row=19, column=1, sticky="w", padx=10, pady=(5, 0))
+        self.medicamentos_text = ctk.CTkTextbox(form_frame, height=60)
+        self.medicamentos_text.grid(row=20, column=1, sticky="nsew", padx=10, pady=(0, 10))
+
+        # Antecedentes familiares
+        ctk.CTkLabel(form_frame, text="Antecedentes familiares", font=ctk.CTkFont(size=12)).grid(
+            row=21, column=0, columnspan=2, sticky="w", padx=10, pady=(5, 0))
+        self.antecedentes_text = ctk.CTkTextbox(form_frame, height=60)
+        self.antecedentes_text.grid(row=22, column=0, columnspan=2, sticky="nsew", padx=10, pady=(0, 10))
         
         # Botones
         botones_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -162,11 +249,21 @@ class NuevoPacienteView(ctk.CTkScrollableFrame):
                 messagebox.showerror("Error", "Formato de fecha incorrecto. Use DD/MM/AAAA")
                 return
         
+        # Formatear RUT si viene y validar duplicado
+        rut_val = self.rut_entry.get().strip()
+        rut_formateado = None
+        if rut_val:
+            rut_formateado = formatear_rut(rut_val)
+            # Validar duplicado
+            if buscar_paciente_por_rut(self.db_session, rut_formateado):
+                messagebox.showerror("Error", "El RUT ingresado ya está registrado")
+                return
+
         # Crear diccionario con los datos
         datos_paciente = {
             'nombre': self.nombre_entry.get().strip(),
             'apellidos': self.apellidos_entry.get().strip(),
-            'rut': self.rut_entry.get().strip() or None,
+            'rut': rut_formateado,
             'fecha_nacimiento': fecha_nacimiento,
             'sexo': self.sexo_combo.get(),
             'telefono': self.telefono_entry.get().strip() or None,
@@ -178,16 +275,45 @@ class NuevoPacienteView(ctk.CTkScrollableFrame):
         try:
             # Crear paciente
             paciente = crear_paciente(self.db_session, **datos_paciente)
+
+            # Recolectar historial clínico (solo si hay información)
+            def _get_text(tb):
+                try:
+                    return tb.get("1.0", "end").strip()
+                except Exception:
+                    return ""
+
+            historial_data = {
+                'patologias': _get_text(self.patologias_text),
+                'alergias': _get_text(self.alergias_text),
+                'intolerancias': _get_text(self.intolerancias_text),
+                'medicamentos': _get_text(self.medicamentos_text),
+                'antecedentes_familiares': _get_text(self.antecedentes_text),
+                'actividad_fisica': self.act_fisica_combo.get() if hasattr(self, 'act_fisica_combo') else None,
+                'habito_tabaquico': self.habito_tabaquico_combo.get() if hasattr(self, 'habito_tabaquico_combo') else None,
+                'consumo_alcohol': self.consumo_alcohol_combo.get() if hasattr(self, 'consumo_alcohol_combo') else None,
+                'objetivo_principal': _get_text(self.objetivo_text),
+            }
+
+            hay_historial = any(v for v in historial_data.values())
+            if hay_historial:
+                crear_historial_clinico(self.db_session, paciente.id, **historial_data)
+
             messagebox.showinfo(
                 "Éxito",
                 f"Paciente {paciente.nombre_completo()} creado correctamente"
             )
-            
+
             # Volver a la lista de pacientes
             if self.callback_volver:
                 self.callback_volver()
-            
+
         except Exception as e:
+            # Recuperar la sesión ante cualquier fallo
+            try:
+                self.db_session.rollback()
+            except Exception:
+                pass
             messagebox.showerror("Error", f"Error al crear el paciente: {str(e)}")
     
     def cancelar(self):

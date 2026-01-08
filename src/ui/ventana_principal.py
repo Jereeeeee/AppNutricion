@@ -183,11 +183,19 @@ class VentanaPrincipal(ctk.CTk):
             text_color="gray"
         )
         subtitulo.grid(row=1, column=0, pady=(0, 40))
+
+        # Texto didáctico
+        ctk.CTkLabel(
+            frame_inicio,
+            text="Explora pacientes, registra mediciones y genera informes. Usa el menú lateral para navegar.",
+            font=ctk.CTkFont(size=14),
+            text_color="#5E0B8A"
+        ).grid(row=2, column=0, pady=(0, 30))
         
         # Estadísticas rápidas
         stats_frame = ctk.CTkFrame(frame_inicio)
-        stats_frame.grid(row=2, column=0, pady=20, padx=40, sticky="ew")
-        stats_frame.grid_columnconfigure((0, 1, 2), weight=1)
+        stats_frame.grid(row=3, column=0, pady=20, padx=40, sticky="ew")
+        stats_frame.grid_columnconfigure((0, 1), weight=1)
         
         # Obtener estadísticas de la base de datos
         from src.database.db_utils import obtener_todos_pacientes
@@ -230,47 +238,6 @@ class VentanaPrincipal(ctk.CTk):
             text_color="white"
         ).pack(pady=(0, 20))
         
-        # Tarjeta de acceso rápido
-        card3 = ctk.CTkFrame(stats_frame, fg_color=("#FF9800", "#F57C00"))
-        card3.grid(row=0, column=2, padx=10, pady=10, sticky="ew")
-        
-        ctk.CTkLabel(
-            card3,
-            text="⚡",
-            font=ctk.CTkFont(size=48),
-            text_color="white"
-        ).pack(pady=(20, 5))
-        
-        ctk.CTkLabel(
-            card3,
-            text="Acceso Rápido",
-            font=ctk.CTkFont(size=14),
-            text_color="white"
-        ).pack(pady=(0, 20))
-        
-        # Botones de acceso rápido
-        acciones_frame = ctk.CTkFrame(frame_inicio, fg_color="transparent")
-        acciones_frame.grid(row=3, column=0, pady=40)
-        
-        btn_nuevo = ctk.CTkButton(
-            acciones_frame,
-            text="➕ Nuevo Paciente",
-            command=self.mostrar_nuevo_paciente,
-            width=200,
-            height=50,
-            font=ctk.CTkFont(size=16, weight="bold")
-        )
-        btn_nuevo.grid(row=0, column=0, padx=10)
-        
-        btn_ver = ctk.CTkButton(
-            acciones_frame,
-            text="👥 Ver Pacientes",
-            command=self.mostrar_pacientes,
-            width=200,
-            height=50,
-            font=ctk.CTkFont(size=16, weight="bold")
-        )
-        btn_ver.grid(row=0, column=1, padx=10)
     
     def mostrar_pacientes(self):
         """Muestra la lista de pacientes"""

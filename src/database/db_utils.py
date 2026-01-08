@@ -2,11 +2,21 @@
 Funciones de utilidad para la base de datos
 """
 from .models import Database, Paciente, Medicion, HistorialClinico, Pauta
+from src.utils.rut import limpiar_rut, formatear_rut
 from datetime import datetime, date
 
 
 def crear_paciente(session, **kwargs):
     """Crea un nuevo paciente en la base de datos"""
+    # Normalizar/formatear RUT y prevenir duplicados si se provee
+    rut = kwargs.get('rut')
+    if rut:
+        kwargs['rut'] = formatear_rut(rut)
+        # Comprobar duplicado por equivalencia de RUT
+        existente = buscar_paciente_por_rut(session, rut)
+        if existente:
+            raise ValueError("El RUT ingresado ya está registrado para otro paciente")
+
     paciente = Paciente(**kwargs)
     session.add(paciente)
     session.commit()
@@ -18,9 +28,19 @@ def obtener_todos_pacientes(session):
     return session.query(Paciente).order_by(Paciente.apellidos).all()
 
 
-def buscar_paciente_por_dni(session, dni):
-    """Busca un paciente por DNI"""
-    return session.query(Paciente).filter_by(dni=dni).first()
+def buscar_paciente_por_rut(session, rut):
+    """Busca un paciente por RUT ignorando formato (puntos/guiones)."""
+    if not rut:
+        return None
+    objetivo = limpiar_rut(rut)
+    candidatos = session.query(Paciente).filter(Paciente.rut.isnot(None)).all()
+    for p in candidatos:
+        try:
+            if limpiar_rut(p.rut) == objetivo:
+                return p
+        except Exception:
+            continue
+    return None
 
 
 def actualizar_paciente(session, paciente_id, **kwargs):
